@@ -20,4 +20,3 @@ benis :DDDD
 - board settings (max upload size, etc.) should all be customizable, with defaults inherited from global config
 - config is in either json or yaml
 - traditional boards model
-- 
