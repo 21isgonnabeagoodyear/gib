@@ -1,6 +1,7 @@
 package gib
 import "time"
 import "io"
+import "errors"
 
 //A full system requires one Datastore, one Imagestore and some number of Frontends for each board
 //each layer should be thread safe internally but make no assumptions about the ordering or timing its methods will be called from
@@ -52,7 +53,7 @@ type Datastore interface{
 //imagestore does not need to be aware of thumbnails, they will just be images with different names
 type Imagestore interface{
 	WriteImage(name string, data io.Reader) error
-	ReadImage(name string) (data io.Reader, error)
+	ReadImage(name string) (io.Reader, error)
 	DeleteImage(name string) error
 }
 
@@ -63,22 +64,38 @@ type Board struct{
 	Datastore
 	Imagestore
 	BoardName string
+	lastpost int
 	//board settings (allowed file types, supported functionality, etc)
 	//...
 }
 //these 3 are just passthroughs to Datastore.  Is there a better way?
 //they could do parsing of comments if we decide not to store html in the Datastore
-func (b *Board)GetPost(num int) (Post, error)
-func (b *Board)GetThread(num int) ([]Post, error)
-func (b *Board)GetThreads(skip int, maxcount int) ([]Post, error)
+func (b *Board)FetchPost(num int) (Post, error){return Post{}, errors.New("not imp")}
+func (b *Board)FetchThread(num int) ([]Post, error){
+	return b.Datastore.GetThread(num)
+}
+//FIXME:renamed to avoid accidental infinite recursion, but should have a better name
+func (b *Board)FetchThreads(skip int, maxcount int) ([]Post, error){
+	return b.GetThreads(0, 100)
+}
 //GetImage and GetThumb will both take the filename in Post, gib must convert that name to a thumbnail name for GetThumb
 //my proposal: "thumb_"+name
-func (b *Board)GetImage(name string) (data io.Reader, error)
-func (b *Board)GetThumb(name string) (data io.Reader, error)
+func (b *Board)FetchImage(name string) (io.Reader, error){return nil, errors.New("not imp")}
+func (b *Board)FetchThumb(name string) (io.Reader, error){return nil, errors.New("not imp")}
 //these must verify the files, save them, generate thumbs (unless this is on demand) and add the post to the database
 //post ordering can be updated here or asynchronously (or on request in the case of rdbms backend)
-func (b *Board)PostThread(op Post, files []io.Reader) error
-func (b *Board)PostReply(post Post, files []io.Reader, Op int) error
+func (b *Board)PostThread(op Post, files []io.Reader) error{
+	op.Timestamp = time.Now()
+	op.Number = b.lastpost
+	b.lastpost ++//TODO:atomic
+	return b.AddThread(op)
+}
+func (b *Board)PostReply(post Post, files []io.Reader, Op int) error{
+	post.Timestamp = time.Now()
+	post.Number = b.lastpost
+	b.lastpost ++//TODO:atomic
+	return b.AddReply(post, Op)
+}
 
 
 
